@@ -34,22 +34,49 @@ const YF_TF_MAP = {
     '1W': { interval: '1wk', range: 'max' },
 };
 
-// ─── CORS Proxy helper ────────────────────────────────────────────────────────
-// Uses a public CORS proxy since Yahoo Finance blocks direct browser requests.
-// corsproxy.io is free and reliable for this use case.
-function yfProxy(url) {
-    return `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+// ─── CORS Proxy fallback chain ────────────────────────────────────────────────
+// Tries multiple free CORS proxies in order. If one fails, moves to the next.
+const PROXIES = [
+    url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://thingproxy.freeboard.io/fetch/${url}`,
+];
+
+async function fetchWithProxy(url, timeoutMs = 6000) {
+    for (let i = 0; i < PROXIES.length; i++) {
+        const proxied = PROXIES[i](url);
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            const res = await fetch(proxied, { signal: controller.signal });
+            clearTimeout(timer);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            // allorigins wraps in {contents: ...} sometimes
+            try {
+                const json = JSON.parse(text);
+                // allorigins.win wraps response in { contents: '...' }
+                if (json && typeof json.contents === 'string') {
+                    return JSON.parse(json.contents);
+                }
+                return json;
+            } catch {
+                return JSON.parse(text);
+            }
+        } catch (err) {
+            console.warn(`[DataEngine] Proxy #${i} failed (${proxied.slice(0, 60)}…):`, err.message);
+            if (i === PROXIES.length - 1) throw err; // all proxies failed
+        }
+    }
 }
 
 // ─── Search Yahoo Finance ─────────────────────────────────────────────────────
 async function searchSymbols(query) {
     if (!query || query.length < 1) return [];
     try {
-        const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=20&newsCount=0&listsCount=0`;
-        const res = await fetch(yfProxy(url));
-        if (!res.ok) throw new Error('Search failed');
-        const json = await res.json();
-        const quotes = json?.result?.quotes || [];
+        const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=20&newsCount=0&listsCount=0&enableFuzzyQuery=true&quotesQueryId=tss_match_phrase_query`;
+        const json = await fetchWithProxy(url);
+        const quotes = json?.quotes || json?.result?.quotes || [];
         return quotes
             .filter(q => q.symbol && q.quoteType && ['EQUITY', 'ETF', 'CRYPTOCURRENCY', 'MUTUALFUND', 'CURRENCY', 'FUTURE', 'INDEX'].includes(q.quoteType))
             .map(q => ({
@@ -69,12 +96,10 @@ async function fetchRealOHLCV(symbol, timeframe) {
     const tf = YF_TF_MAP[timeframe] || YF_TF_MAP['1D'];
     try {
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${tf.interval}&range=${tf.range}`;
-        const res = await fetch(yfProxy(url));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+        const json = await fetchWithProxy(url);
 
         const result = json?.chart?.result?.[0];
-        if (!result) throw new Error('No data');
+        if (!result) throw new Error('No data in response');
 
         const timestamps = result.timestamp || [];
         const q = result.indicators?.quote?.[0] || {};
@@ -86,7 +111,6 @@ async function fetchRealOHLCV(symbol, timeframe) {
 
         const bars = [];
         for (let i = 0; i < timestamps.length; i++) {
-            // Skip bars with null data
             if (closes[i] == null || opens[i] == null) continue;
             bars.push({
                 time: timestamps[i],
@@ -98,10 +122,8 @@ async function fetchRealOHLCV(symbol, timeframe) {
             });
         }
 
-        // Sort ascending just in case
         bars.sort((a, b) => a.time - b.time);
 
-        // Remove duplicate timestamps (can happen with Yahoo data)
         const seen = new Set();
         return bars.filter(b => {
             if (seen.has(b.time)) return false;
@@ -111,7 +133,7 @@ async function fetchRealOHLCV(symbol, timeframe) {
 
     } catch (e) {
         console.warn(`[DataEngine] fetchRealOHLCV(${symbol}, ${timeframe}) failed:`, e);
-        return null; // null = caller should fall back to simulation
+        return null;
     }
 }
 
