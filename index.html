@@ -1,188 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TradingFocus — Chart Studio</title>
-  <meta name="description" content="Free self-hosted TradingView-style chart analysis tool with real-time indicators." />
+  <meta name="description"
+    content="Free self-hosted TradingView-style chart analysis tool with real-time indicators." />
   <link rel="stylesheet" href="styles.css" />
   <!-- TradingView Lightweight Charts v4 (MIT License, free) -->
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 </head>
+
 <body>
 
-<div id="app">
+  <div id="app">
 
-  <!-- ─── HEADER ─────────────────────────────────────────────────────────────── -->
-  <header id="header">
-    <div class="logo">
-      <div class="logo-icon">📈</div>
-      <div>
-        TradingFocus
-        <div class="logo-sub">Chart Studio</div>
+    <!-- ─── HEADER ─────────────────────────────────────────────────────────────── -->
+    <header id="header">
+      <div class="logo">
+        <div class="logo-icon">📈</div>
+        <div>
+          TradingFocus
+          <div class="logo-sub">Chart Studio</div>
+        </div>
       </div>
-    </div>
 
-    <div class="header-divider"></div>
+      <div class="header-divider"></div>
 
-    <span id="symbol-display">BTC/USD</span>
+      <span id="symbol-display">BTC-USD</span>
 
-    <div id="ohlcv-bar">
-      <span class="ohlcv-label">O</span><span>—</span>
-      <span class="ohlcv-label">H</span><span>—</span>
-      <span class="ohlcv-label">L</span><span>—</span>
-      <span class="ohlcv-label">C</span><span>—</span>
-    </div>
-
-    <div class="search-wrapper ml-auto">
-      <input id="symbol-search" type="text" placeholder="Search symbol…" autocomplete="off" />
-      <div id="search-dropdown"></div>
-    </div>
-  </header>
-
-  <!-- ─── TOOLBAR ────────────────────────────────────────────────────────────── -->
-  <div id="toolbar">
-
-    <!-- Chart Types -->
-    <span class="toolbar-label">Type</span>
-    <button class="btn chart-type-btn" data-type="candlestick" title="Candlestick">
-      <span class="btn-icon">🕯️</span> Candle
-    </button>
-    <button class="btn chart-type-btn" data-type="bar" title="Bar Chart">
-      <span class="btn-icon">𝄘</span> Bar
-    </button>
-    <button class="btn chart-type-btn" data-type="line" title="Line Chart">
-      <span class="btn-icon">📉</span> Line
-    </button>
-    <button class="btn chart-type-btn" data-type="area" title="Area Chart">
-      <span class="btn-icon">🏔</span> Area
-    </button>
-
-    <div class="toolbar-sep"></div>
-
-    <!-- Timeframes -->
-    <span class="toolbar-label">TF</span>
-    <div class="tf-group">
-      <button class="btn tf-btn" data-tf="1m">1m</button>
-      <button class="btn tf-btn" data-tf="5m">5m</button>
-      <button class="btn tf-btn" data-tf="15m">15m</button>
-      <button class="btn tf-btn" data-tf="1h">1H</button>
-      <button class="btn tf-btn" data-tf="4h">4H</button>
-      <button class="btn tf-btn" data-tf="1D">1D</button>
-      <button class="btn tf-btn" data-tf="1W">1W</button>
-    </div>
-
-    <div class="toolbar-sep"></div>
-
-    <!-- Drawing Tools -->
-    <span class="toolbar-label">Draw</span>
-    <button class="btn draw-tool-btn" data-tool="hline" title="Horizontal Line">
-      <span class="btn-icon">—</span> H-Line
-    </button>
-    <button class="btn" id="clear-drawings" title="Clear all drawings">
-      <span class="btn-icon">🗑</span> Clear
-    </button>
-
-  </div>
-
-  <!-- ─── SIDEBAR ─────────────────────────────────────────────────────────────── -->
-  <aside id="sidebar">
-
-    <div class="sidebar-section-title">Watchlist</div>
-    <div id="watchlist"></div>
-
-    <!-- Indicator Panel -->
-    <div id="indicator-panel">
-      <div class="sidebar-section-title">Indicators</div>
-      <div class="indicator-grid">
-
-        <button class="indicator-toggle" data-indicator="ma9">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-ma9"></span>MA (9)
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
-        <button class="indicator-toggle" data-indicator="ma20">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-ma20"></span>MA (20)
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
-        <button class="indicator-toggle" data-indicator="ema50">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-ema50"></span>EMA (50)
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
-        <button class="indicator-toggle" data-indicator="bb">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-bb"></span>Bollinger Bands
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
-        <button class="indicator-toggle active" data-indicator="volume">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-vol"></span>Volume
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
-        <button class="indicator-toggle" data-indicator="rsi">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-rsi"></span>RSI (14)
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
-        <button class="indicator-toggle" data-indicator="macd">
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span class="ind-dot ind-dot-macd"></span>MACD
-          </span>
-          <span class="toggle-switch"></span>
-        </button>
-
+      <div id="ohlcv-bar">
+        <span class="ohlcv-label">O</span><span>—</span>
+        <span class="ohlcv-label">H</span><span>—</span>
+        <span class="ohlcv-label">L</span><span>—</span>
+        <span class="ohlcv-label">C</span><span>—</span>
       </div>
+
+      <div class="search-wrapper ml-auto">
+        <input id="symbol-search" type="text" placeholder="Search symbol…" autocomplete="off" />
+        <div id="search-dropdown"></div>
+      </div>
+    </header>
+
+    <!-- ─── TOOLBAR ────────────────────────────────────────────────────────────── -->
+    <div id="toolbar">
+
+      <!-- Chart Types -->
+      <span class="toolbar-label">Type</span>
+      <button class="btn chart-type-btn" data-type="candlestick" title="Candlestick">
+        <span class="btn-icon">🕯️</span> Candle
+      </button>
+      <button class="btn chart-type-btn" data-type="bar" title="Bar Chart">
+        <span class="btn-icon">𝄘</span> Bar
+      </button>
+      <button class="btn chart-type-btn" data-type="line" title="Line Chart">
+        <span class="btn-icon">📉</span> Line
+      </button>
+      <button class="btn chart-type-btn" data-type="area" title="Area Chart">
+        <span class="btn-icon">🏔</span> Area
+      </button>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Timeframes -->
+      <span class="toolbar-label">TF</span>
+      <div class="tf-group">
+        <button class="btn tf-btn" data-tf="1m">1m</button>
+        <button class="btn tf-btn" data-tf="5m">5m</button>
+        <button class="btn tf-btn" data-tf="15m">15m</button>
+        <button class="btn tf-btn" data-tf="1h">1H</button>
+        <button class="btn tf-btn" data-tf="4h">4H</button>
+        <button class="btn tf-btn" data-tf="1D">1D</button>
+        <button class="btn tf-btn" data-tf="1W">1W</button>
+      </div>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Drawing Tools -->
+      <span class="toolbar-label">Draw</span>
+      <button class="btn draw-tool-btn" data-tool="hline" title="Horizontal Line">
+        <span class="btn-icon">—</span> H-Line
+      </button>
+      <button class="btn" id="clear-drawings" title="Clear all drawings">
+        <span class="btn-icon">🗑</span> Clear
+      </button>
+
     </div>
 
-  </aside>
+    <!-- ─── SIDEBAR ─────────────────────────────────────────────────────────────── -->
+    <aside id="sidebar">
 
-  <!-- ─── CHART AREA ──────────────────────────────────────────────────────────── -->
-  <main id="chart-area">
+      <div class="sidebar-section-title">Watchlist</div>
+      <div id="watchlist"></div>
 
-    <!-- Main candlestick chart -->
-    <div id="main-chart"></div>
+      <!-- Indicator Panel -->
+      <div id="indicator-panel">
+        <div class="sidebar-section-title">Indicators</div>
+        <div class="indicator-grid">
 
-    <!-- RSI sub-panel -->
-    <div class="sub-panel" id="rsi-panel" style="display:none;">
-      <div class="sub-panel-label">RSI (14)</div>
-      <div id="rsi-chart"></div>
-    </div>
+          <button class="indicator-toggle" data-indicator="ma9">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-ma9"></span>MA (9)
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
 
-    <!-- MACD sub-panel -->
-    <div class="sub-panel" id="macd-panel" style="display:none;">
-      <div class="sub-panel-label">MACD (12, 26, 9)</div>
-      <div id="macd-chart"></div>
-    </div>
+          <button class="indicator-toggle" data-indicator="ma20">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-ma20"></span>MA (20)
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
 
-  </main>
+          <button class="indicator-toggle" data-indicator="ema50">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-ema50"></span>EMA (50)
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
 
-  <!-- ─── FOOTER ─────────────────────────────────────────────────────────────── -->
-  <footer id="footer">
-    <div class="footer-dot"></div>
-    <span>Live simulation active</span>
-    <span style="color:var(--border)">|</span>
-    <span>Powered by TradingView Lightweight Charts (MIT)</span>
-    <span style="color:var(--border)">|</span>
-    <span>TradingFocus — Self-hosted Chart Studio</span>
-  </footer>
+          <button class="indicator-toggle" data-indicator="bb">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-bb"></span>Bollinger Bands
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
 
-</div><!-- #app -->
+          <button class="indicator-toggle active" data-indicator="volume">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-vol"></span>Volume
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
 
-<script src="data.js"></script>
-<script src="app.js"></script>
+          <button class="indicator-toggle" data-indicator="rsi">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-rsi"></span>RSI (14)
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
+
+          <button class="indicator-toggle" data-indicator="macd">
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span class="ind-dot ind-dot-macd"></span>MACD
+            </span>
+            <span class="toggle-switch"></span>
+          </button>
+
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ─── CHART AREA ──────────────────────────────────────────────────────────── -->
+    <main id="chart-area">
+
+      <!-- Main candlestick chart -->
+      <div id="main-chart"></div>
+
+      <!-- RSI sub-panel -->
+      <div class="sub-panel" id="rsi-panel" style="display:none;">
+        <div class="sub-panel-label">RSI (14)</div>
+        <div id="rsi-chart"></div>
+      </div>
+
+      <!-- MACD sub-panel -->
+      <div class="sub-panel" id="macd-panel" style="display:none;">
+        <div class="sub-panel-label">MACD (12, 26, 9)</div>
+        <div id="macd-chart"></div>
+      </div>
+
+    </main>
+
+    <!-- ─── FOOTER ─────────────────────────────────────────────────────────────── -->
+    <footer id="footer">
+      <div class="footer-dot"></div>
+      <span>Live simulation active</span>
+      <span style="color:var(--border)">|</span>
+      <span>Powered by TradingView Lightweight Charts (MIT)</span>
+      <span style="color:var(--border)">|</span>
+      <span>TradingFocus — Self-hosted Chart Studio</span>
+    </footer>
+
+  </div><!-- #app -->
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
 </body>
+
 </html>

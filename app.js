@@ -5,9 +5,10 @@ const DE = window.DataEngine;
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const state = {
-    symbol: 'BTC/USD',
+    symbol: 'BTC-USD',
     timeframe: '1D',
     chartType: 'candlestick',
+    isRealSymbol: false, // true = fetched from Yahoo Finance
     indicators: {
         ma9: false,
         ma20: false,
@@ -58,6 +59,23 @@ function init() {
     setupDrawingTools();
     setupHoverTooltip();
     setupResizeObserver();
+}
+
+// ─── Loading Overlay ──────────────────────────────────────────────────────────
+function showChartLoading(text = 'Loading…') {
+    let overlay = document.getElementById('chart-loading');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'chart-loading';
+        document.getElementById('main-chart').style.position = 'relative';
+        document.getElementById('chart-area').appendChild(overlay);
+    }
+    overlay.innerHTML = `<div class="chart-loading-inner"><div class="chart-spinner"></div><span>${text}</span></div>`;
+    overlay.style.display = 'flex';
+}
+function hideChartLoading() {
+    const overlay = document.getElementById('chart-loading');
+    if (overlay) overlay.style.display = 'none';
 }
 
 // ─── Main Chart ───────────────────────────────────────────────────────────────
@@ -133,9 +151,31 @@ function syncCharts() {
 }
 
 // ─── Load Symbol & Timeframe ──────────────────────────────────────────────────
-function loadSymbol() {
-    const data = DE.generateOHLCV(state.symbol, state.timeframe);
-    if (!data.length) return;
+async function loadSymbol() {
+    showChartLoading('Fetching ' + state.symbol + '…');
+
+    let data = null;
+
+    // Try real Yahoo Finance data first
+    if (state.isRealSymbol || !DE.SYMBOLS[state.symbol]) {
+        data = await DE.fetchRealOHLCV(state.symbol, state.timeframe);
+        if (data && data.length > 0) {
+            state.isRealSymbol = true;
+        } else {
+            data = null;
+        }
+    }
+
+    // Fall back to local simulation
+    if (!data || data.length === 0) {
+        state.isRealSymbol = false;
+        data = DE.generateOHLCV(state.symbol, state.timeframe);
+    }
+
+    if (!data || !data.length) {
+        hideChartLoading();
+        return;
+    }
 
     // Main series
     if (state.chartType === 'candlestick') {
@@ -165,9 +205,12 @@ function loadSymbol() {
     mainChart.timeScale().fitContent();
 
     // Update header
-    document.getElementById('symbol-display').textContent = state.symbol;
+    document.getElementById('symbol-display').textContent = state.symbol
+        + (state.isRealSymbol ? '' : ' ★');
     const last = data[data.length - 1];
     updateOHLCV(last);
+
+    hideChartLoading();
 }
 
 function refreshIndicators(data) {
@@ -328,27 +371,66 @@ function setupToolbar() {
     });
     document.querySelector('[data-tf="1D"]')?.classList.add('active');
 
-    // Symbol search
+    // ─── Symbol Search (Live Yahoo Finance) ──────────────────────────────────
     const searchInput = document.getElementById('symbol-search');
     const searchDropdown = document.getElementById('search-dropdown');
+    let searchDebounce = null;
+
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim()) searchDropdown.style.display = 'block';
+    });
 
     searchInput.addEventListener('input', () => {
-        const q = searchInput.value.toUpperCase();
-        const matches = Object.keys(DE.SYMBOLS).filter(s => s.includes(q) || DE.SYMBOLS[s].name.toUpperCase().includes(q));
-        searchDropdown.innerHTML = matches.map(s =>
-            `<div class="search-item" data-symbol="${s}">
-        <span class="search-sym">${s}</span>
-        <span class="search-name">${DE.SYMBOLS[s].name}</span>
-      </div>`
-        ).join('');
-        searchDropdown.style.display = matches.length ? 'block' : 'none';
+        const q = searchInput.value.trim();
+        clearTimeout(searchDebounce);
+
+        if (!q) {
+            searchDropdown.style.display = 'none';
+            return;
+        }
+
+        // Show spinner immediately
+        searchDropdown.innerHTML = '<div class="search-loading"><div class="search-spinner"></div> Searching…</div>';
+        searchDropdown.style.display = 'block';
+
+        searchDebounce = setTimeout(async () => {
+            const results = await DE.searchSymbols(q);
+
+            if (!results.length) {
+                searchDropdown.innerHTML = '<div class="search-empty">No results found</div>';
+                return;
+            }
+
+            const typeColors = {
+                EQUITY: '#58a6ff',
+                ETF: '#26a69a',
+                CRYPTOCURRENCY: '#ffa726',
+                MUTUALFUND: '#ab47bc',
+                CURRENCY: '#ef9a9a',
+                FUTURE: '#80cbc4',
+                INDEX: '#b0bec5',
+            };
+
+            searchDropdown.innerHTML = results.map(r => {
+                const color = typeColors[r.type] || '#c9d1d9';
+                const badge = r.exchange ? `<span class="search-exchange">${r.exchange}</span>` : '';
+                return `<div class="search-item" data-symbol="${r.symbol}" data-name="${r.name}">
+                    <span class="search-sym">${r.symbol}</span>
+                    <span class="search-type" style="color:${color}">${r.type}</span>
+                    <span class="search-name">${r.name}</span>
+                    ${badge}
+                </div>`;
+            }).join('');
+            searchDropdown.style.display = 'block';
+        }, 400); // 400 ms debounce
     });
 
     searchDropdown.addEventListener('click', e => {
         const item = e.target.closest('.search-item');
         if (item) {
             const sym = item.dataset.symbol;
-            switchSymbol(sym);
+            const name = item.dataset.name;
+            switchSymbol(sym, name, true);
             searchInput.value = '';
             searchDropdown.style.display = 'none';
         }
@@ -359,12 +441,29 @@ function setupToolbar() {
             searchDropdown.style.display = 'none';
         }
     });
+
+    // Keyboard nav: Enter to pick first result, Escape to close
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            searchDropdown.style.display = 'none';
+            searchInput.blur();
+        }
+        if (e.key === 'Enter') {
+            const first = searchDropdown.querySelector('.search-item');
+            if (first) {
+                switchSymbol(first.dataset.symbol, first.dataset.name, true);
+                searchInput.value = '';
+                searchDropdown.style.display = 'none';
+            }
+        }
+    });
 }
 
-function switchSymbol(sym) {
+function switchSymbol(sym, name = null, isReal = false) {
     state.symbol = sym;
+    state.isRealSymbol = isReal || !DE.SYMBOLS[sym]; // auto-detect
     loadSymbol();
-    // Highlight in watchlist
+    // Highlight in watchlist (only local symbols get highlighted)
     document.querySelectorAll('.watch-item').forEach(el => {
         el.classList.toggle('active', el.dataset.symbol === sym);
     });

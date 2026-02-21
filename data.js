@@ -1,8 +1,9 @@
 // ─── data.js ─── OHLCV Generator & Live Tick Simulator ───────────────────────
 
+// ─── Watchlist Symbols (simulated / local) ────────────────────────────────────
 const SYMBOLS = {
-    'BTC/USD': { base: 29000, volatility: 0.022, name: 'Bitcoin' },
-    'ETH/USD': { base: 1850, volatility: 0.025, name: 'Ethereum' },
+    'BTC-USD': { base: 29000, volatility: 0.022, name: 'Bitcoin' },
+    'ETH-USD': { base: 1850, volatility: 0.025, name: 'Ethereum' },
     'AAPL': { base: 188, volatility: 0.012, name: 'Apple Inc.' },
     'TSLA': { base: 225, volatility: 0.030, name: 'Tesla' },
     'SPY': { base: 445, volatility: 0.008, name: 'S&P 500 ETF' },
@@ -21,7 +22,100 @@ const TIMEFRAMES = {
     '1W': { seconds: 604800, bars: 300 },
 };
 
-// Seeded pseudo-random for reproducibility per symbol
+// ─── Yahoo Finance Timeframe Mapping ──────────────────────────────────────────
+// interval -> { interval, range }
+const YF_TF_MAP = {
+    '1m': { interval: '1m', range: '5d' },
+    '5m': { interval: '5m', range: '60d' },
+    '15m': { interval: '15m', range: '60d' },
+    '1h': { interval: '1h', range: '730d' },
+    '4h': { interval: '60m', range: '730d' }, // YF doesn't have 4h, use 60m
+    '1D': { interval: '1d', range: '5y' },
+    '1W': { interval: '1wk', range: 'max' },
+};
+
+// ─── CORS Proxy helper ────────────────────────────────────────────────────────
+// Uses a public CORS proxy since Yahoo Finance blocks direct browser requests.
+// corsproxy.io is free and reliable for this use case.
+function yfProxy(url) {
+    return `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+}
+
+// ─── Search Yahoo Finance ─────────────────────────────────────────────────────
+async function searchSymbols(query) {
+    if (!query || query.length < 1) return [];
+    try {
+        const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=20&newsCount=0&listsCount=0`;
+        const res = await fetch(yfProxy(url));
+        if (!res.ok) throw new Error('Search failed');
+        const json = await res.json();
+        const quotes = json?.result?.quotes || [];
+        return quotes
+            .filter(q => q.symbol && q.quoteType && ['EQUITY', 'ETF', 'CRYPTOCURRENCY', 'MUTUALFUND', 'CURRENCY', 'FUTURE', 'INDEX'].includes(q.quoteType))
+            .map(q => ({
+                symbol: q.symbol,
+                name: q.shortname || q.longname || q.symbol,
+                type: q.quoteType,
+                exchange: q.exchDisp || q.exchange || '',
+            }));
+    } catch (e) {
+        console.warn('[DataEngine] Search error:', e);
+        return [];
+    }
+}
+
+// ─── Fetch Real OHLCV from Yahoo Finance ─────────────────────────────────────
+async function fetchRealOHLCV(symbol, timeframe) {
+    const tf = YF_TF_MAP[timeframe] || YF_TF_MAP['1D'];
+    try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${tf.interval}&range=${tf.range}`;
+        const res = await fetch(yfProxy(url));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+
+        const result = json?.chart?.result?.[0];
+        if (!result) throw new Error('No data');
+
+        const timestamps = result.timestamp || [];
+        const q = result.indicators?.quote?.[0] || {};
+        const opens = q.open || [];
+        const highs = q.high || [];
+        const lows = q.low || [];
+        const closes = q.close || [];
+        const volumes = q.volume || [];
+
+        const bars = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            // Skip bars with null data
+            if (closes[i] == null || opens[i] == null) continue;
+            bars.push({
+                time: timestamps[i],
+                open: parseFloat(opens[i].toFixed(4)),
+                high: parseFloat(highs[i].toFixed(4)),
+                low: parseFloat(lows[i].toFixed(4)),
+                close: parseFloat(closes[i].toFixed(4)),
+                volume: parseFloat((volumes[i] || 0).toFixed(2)),
+            });
+        }
+
+        // Sort ascending just in case
+        bars.sort((a, b) => a.time - b.time);
+
+        // Remove duplicate timestamps (can happen with Yahoo data)
+        const seen = new Set();
+        return bars.filter(b => {
+            if (seen.has(b.time)) return false;
+            seen.add(b.time);
+            return true;
+        });
+
+    } catch (e) {
+        console.warn(`[DataEngine] fetchRealOHLCV(${symbol}, ${timeframe}) failed:`, e);
+        return null; // null = caller should fall back to simulation
+    }
+}
+
+// ─── Seeded PRNG ──────────────────────────────────────────────────────────────
 function seededRandom(seed) {
     let s = seed;
     return function () {
@@ -30,6 +124,7 @@ function seededRandom(seed) {
     };
 }
 
+// ─── Simulated OHLCV (fallback / watchlist) ───────────────────────────────────
 function generateOHLCV(symbol, timeframe) {
     const cfg = SYMBOLS[symbol];
     const tf = TIMEFRAMES[timeframe];
@@ -40,12 +135,9 @@ function generateOHLCV(symbol, timeframe) {
     const bars = [];
 
     let price = cfg.base;
-    // Start from `bars` intervals ago
     let time = now - tf.seconds * tf.bars;
-    // Align to bar boundary
     time = Math.floor(time / tf.seconds) * tf.seconds;
 
-    // Long-term trend: slight upward drift
     const trend = 0.0001;
 
     for (let i = 0; i < tf.bars; i++) {
@@ -73,7 +165,7 @@ function generateOHLCV(symbol, timeframe) {
     return bars;
 }
 
-// ─── Indicator Calculations ────────────────────────────────────────────────────
+// ─── Indicator Calculations ───────────────────────────────────────────────────
 
 function calcSMA(data, period) {
     const result = [];
@@ -142,7 +234,6 @@ function calcMACD(data, fast = 12, slow = 26, signal = 9) {
     const emaSlow = calcEMA(data, slow);
     const macdLine = [];
 
-    // Align by time
     const slowMap = new Map(emaSlow.map(d => [d.time, d.value]));
     for (const f of emaFast) {
         if (slowMap.has(f.time)) {
@@ -150,7 +241,6 @@ function calcMACD(data, fast = 12, slow = 26, signal = 9) {
         }
     }
 
-    // Signal line = EMA of macd
     const k = 2 / (signal + 1);
     let sig = macdLine.slice(0, signal).reduce((a, b) => a + b.value, 0) / signal;
     const signalLine = [{ time: macdLine[signal - 1].time, value: parseFloat(sig.toFixed(4)) }];
@@ -159,7 +249,6 @@ function calcMACD(data, fast = 12, slow = 26, signal = 9) {
         signalLine.push({ time: macdLine[i].time, value: parseFloat(sig.toFixed(4)) });
     }
 
-    // Histogram
     const sigMap = new Map(signalLine.map(d => [d.time, d.value]));
     const histogram = macdLine
         .filter(d => sigMap.has(d.time))
@@ -172,13 +261,12 @@ function calcMACD(data, fast = 12, slow = 26, signal = 9) {
     return { macdLine, signalLine, histogram };
 }
 
-// ─── Live Tick Simulation ──────────────────────────────────────────────────────
+// ─── Live Tick Simulation (watchlist only) ────────────────────────────────────
 
 const tickListeners = {};
 const lastPrices = {};
 
 function startTickSimulation() {
-    // Initialize last prices from generated data
     for (const sym of Object.keys(SYMBOLS)) {
         const bars = generateOHLCV(sym, '1D');
         lastPrices[sym] = bars.length ? bars[bars.length - 1].close : SYMBOLS[sym].base;
@@ -205,11 +293,14 @@ function getLastPrice(symbol) {
     return lastPrices[symbol] || SYMBOLS[symbol]?.base || 0;
 }
 
-// Export to global scope
+// ─── Export ───────────────────────────────────────────────────────────────────
 window.DataEngine = {
     SYMBOLS,
     TIMEFRAMES,
+    YF_TF_MAP,
     generateOHLCV,
+    fetchRealOHLCV,
+    searchSymbols,
     calcSMA,
     calcEMA,
     calcBollingerBands,
