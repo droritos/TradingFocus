@@ -30,12 +30,12 @@ let bbUpperSeries, bbMidSeries, bbLowerSeries;
 let rsiSeries, rsiOb, rsiOs;
 let macdLineSeries, macdSignalSeries, macdHistSeries;
 
-const CHART_BG = '#0d1117';
-const GRID_COLOR = '#1a2030';
-const TEXT_COLOR = '#c9d1d9';
-const UP_COLOR = '#26a69a';
+const CHART_BG = '#1a0a10';
+const GRID_COLOR = '#3a1828';
+const TEXT_COLOR = '#f5d0dc';
+const UP_COLOR = '#ff80aa';
 const DOWN_COLOR = '#ef5350';
-const ACCENT = '#58a6ff';
+const ACCENT = '#ff5599';
 
 const chartDefaults = {
     layout: { background: { color: CHART_BG }, textColor: TEXT_COLOR, fontSize: 12, fontFamily: 'Inter, sans-serif' },
