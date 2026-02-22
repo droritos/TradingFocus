@@ -283,27 +283,63 @@ function calcMACD(data, fast = 12, slow = 26, signal = 9) {
     return { macdLine, signalLine, histogram };
 }
 
-// ─── Live Tick Simulation (watchlist only) ────────────────────────────────────
+// ─── Live Tick Simulation (real prices base + simulated drift) ────────────────
 
 const tickListeners = {};
 const lastPrices = {};
+const openPrices = {}; // stores today's open for % change calc
 
-function startTickSimulation() {
+// Fetch real current prices for all watchlist symbols at startup
+async function fetchRealWatchlistPrices() {
+    const syms = Object.keys(SYMBOLS).join(',');
+    try {
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=regularMarketPrice,regularMarketOpen,regularMarketPreviousClose,regularMarketChangePercent`;
+        const json = await fetchWithProxy(url);
+        const results = json?.quoteResponse?.result || [];
+        for (const q of results) {
+            if (!q.symbol) continue;
+            const price = q.regularMarketPrice ?? q.regularMarketPreviousClose ?? SYMBOLS[q.symbol]?.base;
+            const open = q.regularMarketOpen ?? price;
+            if (price) {
+                lastPrices[q.symbol] = parseFloat(price.toFixed(4));
+                openPrices[q.symbol] = parseFloat(open.toFixed(4));
+            }
+        }
+        console.log('[DataEngine] Real prices loaded:', lastPrices);
+    } catch (e) {
+        console.warn('[DataEngine] fetchRealWatchlistPrices failed, using simulation base:', e);
+    }
+}
+
+async function startTickSimulation() {
+    // Seed from simulated data first so we have something immediate
     for (const sym of Object.keys(SYMBOLS)) {
         const bars = generateOHLCV(sym, '1D');
-        lastPrices[sym] = bars.length ? bars[bars.length - 1].close : SYMBOLS[sym].base;
+        lastPrices[sym] = lastPrices[sym] ?? (bars.length ? bars[bars.length - 1].close : SYMBOLS[sym].base);
+        openPrices[sym] = openPrices[sym] ?? lastPrices[sym];
     }
 
+    // Then fetch real prices and override (async, watchlist updates when ready)
+    await fetchRealWatchlistPrices();
+
+    // Notify all listeners with the real prices immediately
+    for (const sym of Object.keys(SYMBOLS)) {
+        if (tickListeners[sym]) {
+            tickListeners[sym].forEach(fn => fn(lastPrices[sym], openPrices[sym]));
+        }
+    }
+
+    // Simulate small real-time drift from the real base
     setInterval(() => {
         for (const sym of Object.keys(SYMBOLS)) {
-            const vol = SYMBOLS[sym].volatility / 20;
+            const vol = SYMBOLS[sym].volatility / 40; // smaller drift since it's from real price
             const change = (Math.random() - 0.495) * vol;
             lastPrices[sym] = parseFloat((lastPrices[sym] * (1 + change)).toFixed(4));
             if (tickListeners[sym]) {
-                tickListeners[sym].forEach(fn => fn(lastPrices[sym]));
+                tickListeners[sym].forEach(fn => fn(lastPrices[sym], openPrices[sym]));
             }
         }
-    }, 1000);
+    }, 2000);
 }
 
 function onTick(symbol, callback) {
@@ -313,6 +349,10 @@ function onTick(symbol, callback) {
 
 function getLastPrice(symbol) {
     return lastPrices[symbol] || SYMBOLS[symbol]?.base || 0;
+}
+
+function getOpenPrice(symbol) {
+    return openPrices[symbol] || getLastPrice(symbol);
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────
@@ -331,4 +371,5 @@ window.DataEngine = {
     startTickSimulation,
     onTick,
     getLastPrice,
+    getOpenPrice,
 };

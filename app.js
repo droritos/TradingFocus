@@ -601,29 +601,34 @@ function setupWatchlist() {
 
         const info = DE.SYMBOLS[sym];
         const price = DE.getLastPrice(sym);
+        const safeId = sym.replace(/[^a-zA-Z0-9]/g, '-');
+
         div.innerHTML = `
       <div class="watch-top">
         <span class="watch-sym">${sym}</span>
-        <span class="watch-price" id="wp-${sym.replace('/', '-')}">${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+        <span class="watch-price" id="wp-${safeId}">${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
       </div>
       <div class="watch-bot">
         <span class="watch-name">${info.name}</span>
-        <span class="watch-chg up" id="wc-${sym.replace('/', '-')}">+0.00%</span>
+        <span class="watch-chg" id="wc-${safeId}">—</span>
       </div>
     `;
         div.addEventListener('click', () => switchSymbol(sym));
         list.appendChild(div);
 
-        // Live ticks
-        const basePrice = DE.getLastPrice(sym);
-        DE.onTick(sym, newPrice => {
-            const priceEl = document.getElementById(`wp-${sym.replace('/', '-')}`);
-            const chgEl = document.getElementById(`wc-${sym.replace('/', '-')}`);
+        // Live ticks — openPrice comes from real Yahoo Finance data after fetch
+        DE.onTick(sym, (newPrice, openPrice) => {
+            const priceEl = document.getElementById(`wp-${safeId}`);
+            const chgEl = document.getElementById(`wc-${safeId}`);
             if (!priceEl || !chgEl) return;
-            const pct = ((newPrice - basePrice) / basePrice * 100).toFixed(2);
+
             priceEl.textContent = newPrice >= 1000
                 ? newPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 : newPrice.toFixed(newPrice >= 1 ? 2 : 4);
+
+            // Use real open price for % change if available
+            const base = openPrice || newPrice;
+            const pct = ((newPrice - base) / base * 100).toFixed(2);
             const isUp = parseFloat(pct) >= 0;
             chgEl.textContent = (isUp ? '+' : '') + pct + '%';
             chgEl.className = 'watch-chg ' + (isUp ? 'up' : 'down');
