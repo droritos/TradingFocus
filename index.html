@@ -183,7 +183,26 @@
       <span>TradingFocus — Self-hosted Chart Studio</span>
     </footer>
 
-  </div><!-- #app -->
+    <!-- ─── MOBILE BOTTOM TAB BAR ──────────────────────────────────────────────── -->
+  <div id="mobile-tabs">
+    <button class="mobile-tab active" data-panel="chart">
+      <span class="mobile-tab-icon">📈</span>
+      Chart
+    </button>
+    <button class="mobile-tab" data-panel="watchlist">
+      <span class="mobile-tab-icon">☰</span>
+      Watchlist
+    </button>
+    <button class="mobile-tab" data-panel="indicators">
+      <span class="mobile-tab-icon">⚡</span>
+      Indicators
+    </button>
+  </div>
+
+  <!-- Dim overlay for sidebar drawer -->
+  <div id="sidebar-overlay"></div>
+
+</div><!-- #app -->
 
   <script src="data.js"></script>
   <script src="app.js"></script>

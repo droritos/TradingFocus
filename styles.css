@@ -11,24 +11,24 @@
 }
 
 :root {
-  --bg-0:    #0d1117;
-  --bg-1:    #161b22;
-  --bg-2:    #1c2130;
-  --bg-3:    #21262d;
-  --border:  #30363d;
-  --text-1:  #e6edf3;
-  --text-2:  #8b949e;
-  --text-3:  #484f58;
-  --accent:  #58a6ff;
-  --up:      #26a69a;
-  --down:    #ef5350;
-  --gold:    #ffd700;
-  --purple:  #b388ff;
-  --radius:  8px;
+  --bg-0: #0d1117;
+  --bg-1: #161b22;
+  --bg-2: #1c2130;
+  --bg-3: #21262d;
+  --border: #30363d;
+  --text-1: #e6edf3;
+  --text-2: #8b949e;
+  --text-3: #484f58;
+  --accent: #58a6ff;
+  --up: #26a69a;
+  --down: #ef5350;
+  --gold: #ffd700;
+  --purple: #b388ff;
+  --radius: 8px;
   --sidebar: 220px;
-  --header:  52px;
+  --header: 52px;
   --toolbar: 44px;
-  --footer:  24px;
+  --footer: 24px;
 }
 
 html,
@@ -693,4 +693,231 @@ body {
 /* ─── Utility ────────────────────────────────────────────────────────────────── */
 .ml-auto {
   margin-left: auto;
+}
+
+/* ─── Mobile Bottom Tab Bar ──────────────────────────────────────────────────── */
+#mobile-tabs {
+  display: none;
+}
+
+/* ─── Responsive: Mobile (≤ 768px) ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  :root {
+    --header: 48px;
+    --toolbar: 40px;
+    --footer: 0px;
+    --mobile-tabs: 56px;
+  }
+
+  /* Full-width single-column layout */
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header) var(--toolbar) 1fr var(--mobile-tabs);
+    height: 100dvh;
+    /* use dvh for mobile browser chrome */
+  }
+
+  /* Header: compact, hide logo text and OHLCV detail */
+  #header {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .logo-sub,
+  .header-divider,
+  #ohlcv-bar {
+    display: none;
+  }
+
+  #symbol-display {
+    font-size: 15px;
+    min-width: 60px;
+  }
+
+  #symbol-search {
+    width: 140px;
+    font-size: 12px;
+    padding: 5px 10px 5px 28px;
+  }
+
+  #symbol-search:focus {
+    width: 180px;
+  }
+
+  #search-dropdown {
+    width: 260px;
+    right: 0;
+  }
+
+  /* Toolbar: horizontally scrollable */
+  #toolbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 3px;
+    padding: 0 8px;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+  }
+
+  #toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .btn-icon {
+    font-size: 12px;
+  }
+
+  .tf-btn {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+
+  /* Sidebar: hidden by default, shown as slide-up overlay */
+  #sidebar {
+    display: none;
+    position: fixed;
+    bottom: var(--mobile-tabs);
+    left: 0;
+    right: 0;
+    height: 60vh;
+    max-height: 60vh;
+    z-index: 200;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 32px #00000066;
+    overflow-y: auto;
+    background: var(--bg-1);
+    animation: slideUp 0.25s ease;
+  }
+
+  #sidebar.mobile-open {
+    display: flex;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Drag handle on top of sidebar drawer */
+  #sidebar::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+  }
+
+  /* Chart area: full width */
+  #chart-area {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  /* Footer: hidden on mobile (replaced by tab bar) */
+  #footer {
+    display: none;
+  }
+
+  /* ── Bottom Tab Bar ── */
+  #mobile-tabs {
+    display: flex;
+    grid-column: 1;
+    grid-row: 4;
+    background: var(--bg-1);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+
+  .mobile-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-3);
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-tab.active {
+    color: var(--accent);
+  }
+
+  .mobile-tab-icon {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  /* Dim overlay behind sidebar */
+  #sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #00000066;
+    z-index: 190;
+  }
+
+  #sidebar-overlay.active {
+    display: block;
+  }
+
+  /* Bigger touch targets for watchlist items */
+  .watch-item {
+    padding: 12px 14px;
+  }
+
+  /* Indicator toggles slightly bigger */
+  .indicator-toggle {
+    padding: 10px 12px;
+  }
+
+  /* Search dropdown scroll */
+  #search-dropdown {
+    max-height: 280px;
+  }
+}
+
+/* ─── Very small phones (≤ 380px) ───────────────────────────────────────────── */
+@media (max-width: 380px) {
+  #symbol-search {
+    width: 110px;
+  }
+
+  #symbol-search:focus {
+    width: 150px;
+  }
+
+  .btn {
+    padding: 3px 6px;
+  }
 }

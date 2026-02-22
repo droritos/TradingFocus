@@ -59,6 +59,50 @@ function init() {
     setupDrawingTools();
     setupHoverTooltip();
     setupResizeObserver();
+    setupMobileTabs();
+}
+
+// ─── Mobile Tab Bar ───────────────────────────────────────────────────────────
+function setupMobileTabs() {
+    const tabs = document.querySelectorAll('.mobile-tab');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (!tabs.length || !sidebar || !overlay) return;
+
+    function openPanel(panel) {
+        if (panel === 'chart') {
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+        } else {
+            // Show correct section in sidebar
+            const watchlist = document.getElementById('watchlist');
+            const indicators = document.getElementById('indicator-panel');
+            if (panel === 'watchlist') {
+                watchlist?.scrollIntoView();
+                if (indicators) indicators.style.display = '';
+            } else if (panel === 'indicators') {
+                indicators?.scrollIntoView();
+            }
+            sidebar.classList.add('mobile-open');
+            overlay.classList.add('active');
+        }
+    }
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            openPanel(tab.dataset.panel);
+        });
+    });
+
+    // Tap overlay to close
+    overlay.addEventListener('click', () => {
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+        tabs.forEach(t => t.classList.remove('active'));
+        document.querySelector('[data-panel="chart"]')?.classList.add('active');
+    });
 }
 
 // ─── Loading Overlay ──────────────────────────────────────────────────────────
